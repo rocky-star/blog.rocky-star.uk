@@ -1,6 +1,4 @@
-# I'm Rocky☆Star
-
-My PGP public key is:
+I'm Rocky☆Star. The following is my PGP public key:
 
 ```
 -----BEGIN PGP PUBLIC KEY BLOCK-----
