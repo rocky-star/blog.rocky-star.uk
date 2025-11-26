@@ -1,0 +1,45 @@
+baseURL = "https://rocky-star.github.io/"
+languageCode = "en-us"
+title = "Die Welt von Gestern"
+theme = "stack"
+
+defaultContentLanguage = "en"
+
+markup.goldmark.renderer.unsafe = true
+markup.highlight.noClasses = false
+
+[languages.en]
+languageCode = "en-us"
+languageName = "English"
+
+[languages.zh-CN]
+languageName = "简体中文"
+title = "不冻港之炎"
+params.sidebar.subtitle = "我们奋力向前，小舟逆水而上，不断地被浪潮推回到过去。"
+params.comments.giscus.lang = "zh-CN"
+
+[params]
+mainSections = [ "posts" ]
+
+sidebar.subtitle = "So we beat on, boats against the current, borne back ceaselessly into the past."
+sidebar.avatar.src = "img/avatar.jpg"
+footer.since = 2024
+widgets.page = [ { type = "toc" } ]
+
+[params.comments]
+enabled = true
+provider = "giscus"
+
+[params.comments.giscus]
+repo = "rocky-star/rocky-star.github.io"
+repoID = "R_kgDOOHGx2g"
+category = "Announcements"
+categoryID = "DIC_kwDOOHGx2s4CzCDR"
+mapping = "pathname"
+strict = 1
+reactionsEnabled = 1
+emitMetadata = 0
+inputPosition = "bottom"
+lightTheme = "light"
+darkTheme = "dark"
+lang = "en"
