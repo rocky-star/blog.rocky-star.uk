@@ -11,7 +11,7 @@ params = { icon = "info-circle" }
 
 The following is my PGP public key:
 
-```
+```text
 -----BEGIN PGP PUBLIC KEY BLOCK-----
 
 mDMEYs7k2hYJKwYBBAHaRw8BAQdAhmv0Q+kIiX4jHCkEBxFGijowOAbtfpHEVmD4

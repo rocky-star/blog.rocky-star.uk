@@ -10,7 +10,7 @@ params = { icon = "info-circle" }
 
 以下是我的 PGP 公钥：
 
-```
+```text
 -----BEGIN PGP PUBLIC KEY BLOCK-----
 
 mDMEYs7k2hYJKwYBBAHaRw8BAQdAhmv0Q+kIiX4jHCkEBxFGijowOAbtfpHEVmD4
