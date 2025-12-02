@@ -2,8 +2,8 @@ baseURL = "https://blog.rocky-star.uk/"
 languageCode = "en-us"
 title = "Die Welt von Gestern"
 theme = "stack"
-
 defaultContentLanguage = "en"
+enableRobotsTXT = true
 
 markup.goldmark.renderer.unsafe = true
 markup.highlight.noClasses = false
