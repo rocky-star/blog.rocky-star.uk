@@ -1,52 +1,52 @@
 +++
 date = "2025-11-26T05:25:34+08:00"
 draft = false
-title = "在 Proxmox VE 上安装群晖 Virtual DSM"
+title = "在Proxmox VE上安装群晖 Virtual DSM"
 description = "更可靠地安装黑群晖虚拟机，免去对各类第三方引导程序的依赖。"
 +++
 
-要在非群晖官方硬件上运行群晖 DiskStation Manager（DSM）系统（即黑群晖），一般有两种方式：直接在实体机上安装 DSM，或是先在实体机上安装虚拟化平台，再在虚拟机中安装 DSM。这两种方式都依赖于第三方引导程序（如 [ARPL](https://github.com/fbelavenuto/arpl) 和 [RR](https://github.com/RROrg/rr)）。本文将指引您在 Proxmox VE 上安装群晖 Virtual DSM，即群晖的官方虚拟化系统。相比使用第三方引导程序，选用 Virtual DSM 有一些优势，包括：
+要在非群晖官方硬件上运行群晖DiskStation Manager（DSM）系统（即黑群晖），一般有两种方式：直接在实体机上安装DSM，或是先在实体机上安装虚拟化平台，再在虚拟机中安装DSM。这两种方式都依赖于第三方引导程序（如[ARPL](https://github.com/fbelavenuto/arpl)和[RR](https://github.com/RROrg/rr)）。本文将指引您在Proxmox VE上安装群晖Virtual DSM，即群晖的官方虚拟化系统。相比使用第三方引导程序，选用Virtual DSM有一些优势，包括：
 
-* 使用 VirGL 半虚拟化显卡以轻松启用 Synology Photos 人脸识别等功能，而无需独占透传硬件显卡；
+* 使用VirGL半虚拟化显卡以轻松启用Synology Photos人脸识别等功能，而无需独占透传硬件显卡；
 * 无需使用第三方引导程序，只使用群晖的官方代码；
-* 系统自带 virtio 半虚拟化设备驱动程序，无需注入驱动程序；
+* 系统自带virtio半虚拟化设备驱动程序，无需注入驱动程序；
 
-但 Virtual DSM 也有一些缺陷：
+但Virtual DSM也有一些缺陷：
 
-* 不支持 NVMe 控制器，因此您的 NVMe 固态硬盘需要以虚拟磁盘的形式（而非透传）连接进虚拟机；
-* 不支持查看 SMART 数据，因此您需要在 Proxmox VE 上配置 SMART 监测；
-* 磁盘分区结构与官方群晖硬件和黑群晖不同，Virtual DSM 的每块磁盘都只包含一个 Btrfs 分区；
-* 不支持 Virtual Machine Manager 套件；
-* Surveillance Station 套件不包含任何免费许可证。
+* 不支持NVMe控制器，因此您的NVMe固态硬盘需要以虚拟磁盘的形式（而非透传）连接进虚拟机；
+* 不支持查看SMART数据，因此您需要在Proxmox VE上配置SMART监测；
+* 磁盘分区结构与官方群晖硬件和黑群晖不同，Virtual DSM的每块磁盘都只包含一个Btrfs分区；
+* 不支持Virtual Machine Manager套件；
+* Surveillance Station套件不包含任何免费许可证。
 
-本文给出的步骤来自于 [vdsm/virtual-dsm](https://github.com/vdsm/virtual-dsm) 项目，该项目让您能在 Docker 中以容器形式安装 Virtual DSM，其实现方式是将宿主机的 /dev/kvm 设备挂载到容器内，再在容器内运行 QEMU/KVM。由于 Proxmox VE 不支持 Docker，因此要使用此项目，必须先创建一个 LXC 容器，再在容器中安装 Docker，最后在容器内的 Docker 中使用此项目运行 QEMU/KVM。考虑到 Proxmox VE 为 QEMU/KVM 虚拟机提供了原生支持，这样层层嵌套似乎显得有些多余。本文的目的即为指引您直接在 Proxmox VE 中安装 Virtual DSM，而无需利用此项目。
+本文给出的步骤来自于[vdsm/virtual-dsm](https://github.com/vdsm/virtual-dsm)项目，该项目让您能在Docker中以容器形式安装Virtual DSM，其实现方式是将宿主机的/dev/kvm设备挂载到容器内，再在容器内运行QEMU/KVM。由于Proxmox VE不支持Docker，因此要使用此项目，必须先创建一个LXC容器，再在容器中安装Docker，最后在容器内的Docker中使用此项目运行QEMU/KVM。考虑到Proxmox VE为QEMU/KVM虚拟机提供了原生支持，这样层层嵌套似乎显得有些多余。本文的目的即为指引您直接在Proxmox VE中安装Virtual DSM，而无需利用此项目。
 
 ## 先决条件
 
-您的宿主机上应安装有 Proxmox VE 8 或更高版本。如没有，您可从此[下载安装映像文件](https://mirrors.tuna.tsinghua.edu.cn/proxmox/iso/proxmox-ve_9.1-1.iso)。
+您的宿主机上应安装有Proxmox VE 8或更高版本。如没有，您可从此[下载安装映像文件](https://mirrors.tuna.tsinghua.edu.cn/proxmox/iso/proxmox-ve_9.1-1.iso)。
 
 ## 创建虚拟机
 
-您需要在 Proxmox VE 中为 Virtual DSM 创建虚拟机。创建时，请注意：
+您需要在Proxmox VE中为Virtual DSM创建虚拟机。创建时，请注意：
 
-* 选用 VirtIO SCSI single 作 SCSI 控制器；
-* 不启用 QEMU 客户机代理；
-* 在 scsi9 创建一个大小为 128 MiB（0.125 GiB）的引导磁盘；
+* 选用VirtIO SCSI single作SCSI控制器；
+* 不启用QEMU客户机代理；
+* 在scsi9创建一个大小为128 MiB（0.125 GiB）的引导磁盘；
 * 为网络设备选择到局域网的网桥，并禁用防火墙。
 
-创建完成后，请在 scsi10 创建一个大小为 10 GiB 的系统磁盘。用于数据存储的磁盘应于 scsi11、scsi12 等位置添加，以此类推。
+创建完成后，请在scsi10创建一个大小为10 GiB的系统磁盘。用于数据存储的磁盘应于scsi11、scsi12等位置添加，以此类推。
 
-![配置 SCSI 控制器并禁用 QEMU 客户机代理](no-qemu-agent.png)
+![配置SCSI控制器并禁用QEMU客户机代理](no-qemu-agent.png)
 
 ![禁用网络设备的防火墙](disable-firewall.png)
 
-![配置 scsi9 磁盘](scsi9.png)
+![配置scsi9磁盘](scsi9.png)
 
-![配置 scsi10 磁盘](scsi10.png)
+![配置scsi10磁盘](scsi10.png)
 
 ## 获取补丁文件提取工具
 
-较新的 DSM 补丁文件无法用 tar 提取，因此您需要从 DSM 7.0.1-42218 的补丁文件中获取用以提取文件的工具 syno_<wbr>extract_<wbr>system_<wbr>patch。连接到 Proxmox VE 服务器并执行下列命令，以下载 DSM 7.0.1-42218 的补丁文件：
+较新的DSM补丁文件无法用tar提取，因此您需要从DSM 7.0.1-42218的补丁文件中获取用以提取文件的工具syno_<wbr>extract_<wbr>system_<wbr>patch。连接到Proxmox VE服务器并执行下列命令，以下载DSM 7.0.1-42218的补丁文件：
 
 ```console
 # wget https://cndl.synology.cn/download/DSM/release/7.0.1/42218/DSM_VirtualDSM_42218.pat
@@ -68,14 +68,14 @@ DSM_VirtualDSM_42218.pat     100%[===========================================>] 
 
 ```
 
-执行下列命令以从补丁文件中提取 rd.gz 文件：
+执行下列命令以从补丁文件中提取rd.gz文件：
 
 ```console
 # tar -xvf DSM_VirtualDSM_42218.pat rd.gz
 rd.gz
 ```
 
-执行下列命令以提取 rd.gz 文件的内容：
+执行下列命令以提取rd.gz文件的内容：
 ```console
 # xz -dc < rd.gz > rd.cpio
 xz: (stdin): Compressed data is corrupt
@@ -86,7 +86,7 @@ xz: (stdin): Compressed data is corrupt
 # cd ..
 ```
 
-执行下列命令以准备 syno_<wbr>extract_<wbr>system_<wbr>patch 的文件：
+执行下列命令以准备syno_<wbr>extract_<wbr>system_<wbr>patch的文件：
 
 ```console
 # mkdir extract
@@ -102,9 +102,9 @@ xz: (stdin): Compressed data is corrupt
 # chmod +x extract/syno_extract_system_patch
 ```
 
-## 下载 DSM 并准备根文件系统
+## 下载DSM并准备根文件系统
 
-执行下列命令，以下载 DSM 7.2.2-72806 的补丁文件：
+执行下列命令，以下载DSM 7.2.2-72806的补丁文件：
 
 ```console
 # wget https://cndl.synology.cn/download/DSM/release/7.2.2/72806/DSM_VirtualDSM_72806.pat
@@ -126,7 +126,7 @@ DSM_VirtualDSM_72806.pat     100%[===========================================>] 
 
 ```
 
-执行下列命令，以提取补丁文件的内容到 patch 目录：
+执行下列命令，以提取补丁文件的内容到patch目录：
 
 ```console
 # mkdir patch
@@ -141,7 +141,7 @@ Archive:  patch/synology_kvmx64_virtualdsm_72806_8A784779__.bin.zip
   inflating: synology_kvmx64_virtualdsm_72806_8A784779__.bin
 ```
 
-**注意!** 若找不到 unzip 命令，执行`apt install unzip`以安装，然后再试一次。
+**注意!** 若找不到unzip命令，执行`apt install unzip`以安装，然后再试一次。
 
 执行下列命令，以准备根文件系统：
 
@@ -156,11 +156,11 @@ Archive:  patch/synology_kvmx64_virtualdsm_72806_8A784779__.bin.zip
 # tar -xJpf patch/hda1.txz --skip-old-files -C rootfs
 ```
 
-## 建立硬盘分区并安装 DSM
+## 建立硬盘分区并安装DSM
 
-请记住您的虚拟机 ID，其一般为三位数字（如 100）。在之后的命令中，我将以 &lt;VMID&gt; 来标注它。遇到此标记时，您应将您的虚拟机 ID 用以替换。此外，↵ 则代表您应按回车键，以同意默认选项或默认值。
+请记住您的虚拟机ID，其一般为三位数字（如100）。在之后的命令中，我将以&lt;VMID&gt;来标注它。遇到此标记时，您应将您的虚拟机ID用以替换。此外，↵则代表您应按回车键，以同意默认选项或默认值。
 
-执行下列命令，以使用 fdisk 建立磁盘分区：
+执行下列命令，以使用fdisk建立磁盘分区：
 
 ```console
 # fdisk /dev/pve/vm-<VMID>-disk-1
@@ -248,15 +248,15 @@ Writing superblocks and filesystem accounting information: done
 # dd if=synology_kvmx64_virtualdsm_72806_8A784779__.bin of=/dev/pve/vm-<VMID>-disk-0 bs=1M
 ```
 
-## 配置 qemu-host 并添加 graceful shutdown 支持
+## 配置qemu-host并添加graceful shutdown支持
 
-Virtual DSM 在标准的 QEMU 客户机代理（QEMU guest agent）协议上以专有协议与宿主机通信，并获取序列号等硬件信息。但 Proxmox VE 所附带的 QEMU 客户机代理支持无法支持这一协议。因此，您需要安装第三方工具 [qemu-host](https://github.com/qemus/qemu-host)，以手动指定序列号等参数。
+Virtual DSM在标准的QEMU客户机代理（QEMU guest agent）协议上以专有协议与宿主机通信，并获取序列号等硬件信息。但Proxmox VE所附带的QEMU客户机代理支持无法支持这一协议。因此，您需要安装第三方工具[qemu-host](https://github.com/qemus/qemu-host)，以手动指定序列号等参数。
 
-有多种方式可用以运行 qemu-host 工具，本文则使用 systemd 管理它的启停。此外，由于让 Virtual DSM 正确关机的方法是给它的 QEMU 客户机代理发送 QMP 指令，而要发送此种指令，必须使用 qemu-host 的 HTTP API。因此，此 graceful shutdown 功能亦将用 hookscript 提供支持。
+有多种方式可用以运行qemu-host工具，本文则使用systemd管理它的启停。此外，由于让Virtual DSM正确关机的方法是给它的QEMU客户机代理发送QMP指令，而要发送此种指令，必须使用qemu-host的HTTP API。因此，此graceful shutdown功能亦将用hookscript提供支持。
 
-### 下载 qemu-host
+### 下载qemu-host
 
-执行下列命令，以下载 qemu-host 工具：
+执行下列命令，以下载qemu-host工具：
 
 ```console
 # wget -O /usr/local/bin/qemu-host https://github.com/qemus/qemu-host/releases/download/v2.05/qemu-host.bin
@@ -278,16 +278,16 @@ Saving to: ‘/usr/local/bin/qemu-host’
 
 ```
 
-执行下列命令，以获取您的 CPU 型号：
+执行下列命令，以获取您的CPU型号：
 
 ```console
 # lscpu | grep -m 1 'Model name' | cut -f 2 -d ":" | awk '{$1=$1}1' | sed 's# @.*##g' | sed s/"(R)"//g | sed 's/[^[:alnum:] ]\+/ /g' | sed 's/  */ /g'
 <CPU>
 ```
 
-### 创建并启用 qemu-host systemd 服务
+### 创建并启用qemu-host systemd服务
 
-新建文件 /etc/systemd/system/qemu-host.service，并填入以下内容：
+新建文件/etc/systemd/system/qemu-host.service，并填入以下内容：
 
 ```ini
 [Unit]
@@ -301,34 +301,34 @@ ExecStart=/usr/local/bin/qemu-host -cpu <N-CORES> -cpu_arch '<CPU>,,'
 WantedBy=multi-user.target
 ```
 
-将 &lt;N-CORES&gt; 替换为您为虚拟机分配的核心数量，并将 &lt;CPU&gt; 替换为您在上一步获得的 CPU 型号。
+将&lt;N-CORES&gt;替换为您为虚拟机分配的核心数量，并将&lt;CPU&gt;替换为您在上一步获得的CPU型号。
 
-若要在 Virtual DSM 中登录群晖账户，或激活 Surveillance Station 的许可证，您需要将 ExecStart 行替换为下列内容：
+若要在Virtual DSM中登录群晖账户，或激活Surveillance Station的许可证，您需要将ExecStart行替换为下列内容：
 
 ```ini
 ExecStart=/usr/local/bin/qemu-host -cpu <N-CORES> -cpu_arch '<CPU>,,' -hostsn <HOST-SN> -guestsn <GUEST-SN>
 ```
 
-将 &lt;HOST-SN&gt; 替换为某台官方群晖设备的序列号，并将 &lt;GUEST-SN&gt; 替换为有效的 Virtual DSM 序列号。要获得有效的 Virtual DSM 序列号，您应在某台官方群晖设备上创建 Virtual DSM，并获取它的序列号。
+将&lt;HOST-SN&gt;替换为某台官方群晖设备的序列号，并将&lt;GUEST-SN&gt;替换为有效的Virtual DSM序列号。要获得有效的Virtual DSM序列号，您应在某台官方群晖设备上创建Virtual DSM，并获取它的序列号。
 
-若要在安装有 DSM 7.2 或更高版本的 Virtual DSM 中启用 Advanced Media Extensions，您需要将 ExecStart 行替换为下列内容：
+若要在安装有DSM 7.2或更高版本的Virtual DSM中启用Advanced Media Extensions，您需要将ExecStart行替换为下列内容：
 
 ```ini
 ExecStart=/usr/local/bin/qemu-host -cpu <N-CORES> -cpu_arch '<CPU>,,' -mac <MAC> -model <MODEL> -hostsn <HOST-SN> -guestsn <GUEST-SN>
 ```
 
-将 &lt;MAC&gt; 替换为某台官方群晖设备的 MAC 地址（形如 aa:bb:cc:dd:ee:ff），并将 &lt;MODEL&gt; 替换为这台官方群晖设备的型号。
+将&lt;MAC&gt;替换为某台官方群晖设备的MAC地址（形如aa:bb:cc:dd:ee:ff），并将&lt;MODEL&gt;替换为这台官方群晖设备的型号。
 
-重新加载 systemd 单元并启用该服务：
+重新加载systemd单元并启用该服务：
 
 ```console
 # systemctl daemon-reload
 # systemctl enable --now qemu-host
 ```
 
-### 设置 hookscript
+### 设置hookscript
 
-新建文件 /var/lib/vz/snippets/hookscript-vdsm.sh，并填入以下内容：
+新建文件/var/lib/vz/snippets/hookscript-vdsm.sh，并填入以下内容：
 
 ```bash
 #!/bin/sh
@@ -341,7 +341,7 @@ else
 fi
 ```
 
-执行下列命令，以将上述脚本指定为虚拟机的 hookscript：
+执行下列命令，以将上述脚本指定为虚拟机的hookscript：
 
 ```console
 # chmod +x /var/lib/vz/snippets/hookscript-vdsm.sh
@@ -349,21 +349,21 @@ fi
 update VM <VMID>: -hookscript local:snippets/hookscript-vdsm.sh
 ```
 
-### 为虚拟机设置 QGA 设备
+### 为虚拟机设置QGA设备
 
-编辑虚拟机配置文件 /etc/pve/qemu-server/&lt;VMID&gt;.conf，并将下列内容加入文件：
+编辑虚拟机配置文件/etc/pve/qemu-server/&lt;VMID&gt;.conf，并将下列内容加入文件：
 
 ```text
 args: -chardev 'socket,host=127.0.0.1,port=12345,server=off,reconnect=10,id=qga0' -device 'virtio-serial,id=qga0,bus=pci.0,addr=0x8' -device 'virtserialport,chardev=qga0,name=vchannel'
 ```
 
-## 启动 Virtual DSM
+## 启动Virtual DSM
 
-恭喜！您的 Virtual DSM 虚拟机现已就绪。请启动您的虚拟机，然后在浏览器的地址栏中输入虚拟机的 IP 地址，以连接到 DSM。若您找不到虚拟机的 IP 地址，也可使用 [Synology Web Assistant](https://finds.synology.com/) 以连接到 DSM。
+恭喜！您的Virtual DSM虚拟机现已就绪。请启动您的虚拟机，然后在浏览器的地址栏中输入虚拟机的IP地址，以连接到DSM。若您找不到虚拟机的IP地址，也可使用[Synology Web Assistant](https://finds.synology.com/)以连接到DSM。
 
 ![Synology Web Assistant](synology-web-assistant.png)
 
-![DSM 桌面](dsm-desktop.jpg)
+![DSM桌面](dsm-desktop.jpg)
 
 如需要，您可执行下列命令，以清理安装过程中产生的文件。
 
@@ -371,7 +371,7 @@ args: -chardev 'socket,host=127.0.0.1,port=12345,server=off,reconnect=10,id=qga0
 # rm -rf DSM_VirtualDSM_*.pat extract patch rd*
 ```
 
-您可保留引导程序文件（synology_<wbr>kvmx64_<wbr>virtualdsm_<wbr>72806_<wbr>8A784779__.bin）和根文件系统目录（rootfs），以备您安装更多 Virtual DSM 虚拟机。若要删除它们，您可继续执行下列命令：
+您可保留引导程序文件（synology_<wbr>kvmx64_<wbr>virtualdsm_<wbr>72806_<wbr>8A784779__.bin）和根文件系统目录（rootfs），以备您安装更多Virtual DSM虚拟机。若要删除它们，您可继续执行下列命令：
 
 ```console
 # rm -rf synology_kvmx64_virtualdsm_*.bin rootfs

@@ -8,7 +8,7 @@ weight = 10
 params = { icon = "info-circle" }
 +++
 
-以下是我的 PGP 公钥：
+以下是我的PGP公钥：
 
 ```text
 -----BEGIN PGP PUBLIC KEY BLOCK-----
