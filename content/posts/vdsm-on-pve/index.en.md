@@ -1,6 +1,8 @@
 +++
 date = "2025-11-26T03:05:24+08:00"
 draft = false
+categories = [ "Homelab" ]
+tags = [ "Virtual DSM", "Proxmox VE" ]
 title = "Installing Synology Virtual DSM on Proxmox VE"
 description = "A reliable method to install Xpenology VMs, without needing of third-party boot loaders."
 +++

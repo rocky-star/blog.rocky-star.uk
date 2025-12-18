@@ -1,6 +1,8 @@
 +++
 date = "2025-11-26T05:25:34+08:00"
 draft = false
+categories = [ "NAS" ]
+tags = [ "Virtual DSM", "Proxmox VE" ]
 title = "在Proxmox VE上安装群晖 Virtual DSM"
 description = "更可靠地安装黑群晖虚拟机，免去对各类第三方引导程序的依赖。"
 +++
